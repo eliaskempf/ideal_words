@@ -1,0 +1,33 @@
+name: Unit tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: py${{ matrix.python }}-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu]
+        python: [3.10, 3.11, 3.12]
+        include:
+        - os: macos
+          python: 3.12
+        - os: windows
+          python: 3.12
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python }}
+    - name: Install
+      run: |
+        pip install .[dev]
+    - name: Tests
+      run: |
+        pytest -vv
