@@ -1,4 +1,5 @@
 import os
+import time
 
 import torch
 from open_clip import create_model_and_transforms, get_tokenizer
@@ -30,6 +31,9 @@ class AttributeObjectFactorEmbedding(FactorEmbedding):
 
 
 if __name__ == '__main__':
+    # keep track of execution time
+    start = time.time()
+
     # in the paper, they used a ViT-L-14 based CLIP model from OpenAI
     clip, _, preprocess_val = create_model_and_transforms('ViT-L-14', precision='fp16', pretrained='openai')
     tokenizer = get_tokenizer('ViT-L-14')
@@ -67,8 +71,11 @@ if __name__ == '__main__':
     print('                 IW            RW            Avg    ')
     print('----------------------------------------------------')
     print(
-        f'MIT-States   {mit_iw_score:.2f} ± {mit_iw_std:.2f}   {mit_rw_score:.2f} ± {mit_rw_std:.2f}   {mit_avg_score:.2f} ± {mit_avg_std:.2f}'
+        f'MIT-States   {mit_iw_score:.2f} ± {mit_iw_std:.2f}   {mit_rw_score:.2f} ± {mit_rw_std:.2f}   '
+        f'{mit_avg_score:.2f} ± {mit_avg_std:.2f}'
     )
     print(
-        f'UT Zappos    {ut_iw_score:.2f} ± {ut_iw_std:.2f}   {ut_rw_score:.2f} ± {ut_rw_std:.2f}   {ut_avg_score:.2f} ± {ut_avg_std:.2f}'
+        f'UT Zappos    {ut_iw_score:.2f} ± {ut_iw_std:.2f}   {ut_rw_score:.2f} ± {ut_rw_std:.2f}   '
+        f'{ut_avg_score:.2f} ± {ut_avg_std:.2f}'
     )
+    print(f'\nTook {time.time() - start:.2f} seconds')
