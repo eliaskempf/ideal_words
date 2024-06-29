@@ -11,7 +11,6 @@ from ideal_words import FactorEmbedding, IdealWords
 class AttributeObjectFactorEmbedding(FactorEmbedding):
     def encode_text(self, text: torch.Tensor) -> torch.Tensor:
         # CLIP is not only a text encoder, so we need to specify how to use it for encoding text
-
         return self.txt_encoder.encode_text(text)
 
     def joint_repr(self, pair: tuple[str, ...]) -> str:

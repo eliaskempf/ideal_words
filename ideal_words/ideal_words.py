@@ -291,7 +291,7 @@ class IdealWords:
         if self._avg_score is None:
             # compute pairwise distances of original embedding vectors
             embeddings = self.embeddings.half()  # save some memory as this metric is expensive to compute
-            dists = torch.cdist(embeddings, embeddings)
+            dists = torch.cdist(embeddings, embeddings, compute_mode='use_mm_for_euclid_dist')
 
             # dists is a symmetric matrix with diagonal 0 because cdist considers ordered pairs
             # so we only average over the upper triangular half of dists
