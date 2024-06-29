@@ -1,3 +1,4 @@
+import argparse
 import os
 import time
 
@@ -31,11 +32,18 @@ class AttributeObjectFactorEmbedding(FactorEmbedding):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--random-init', action='store_true', help='use a randomly initialized encoder instead of the pretrained one'
+    )
+    args = parser.parse_args()
+
     # keep track of execution time
     start = time.time()
 
     # in the paper, they used a ViT-L-14 based CLIP model from OpenAI
-    clip, _, preprocess_val = create_model_and_transforms('ViT-L-14', precision='fp16', pretrained='openai')
+    pretrained = None if args.random_init else 'openai'
+    clip, *_ = create_model_and_transforms('ViT-L-14', precision='fp16', pretrained=pretrained)
     tokenizer = get_tokenizer('ViT-L-14')
     print('Loaded CLIP model and tokenizer.')
 

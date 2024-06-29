@@ -294,9 +294,8 @@ class IdealWords:
             dists = torch.cdist(embeddings, embeddings)
 
             # dists is a symmetric matrix with diagonal 0 because cdist considers ordered pairs
-            # so we only average over the lower triangular half of dists
-            mask = torch.ones_like(dists, dtype=torch.bool).triu()
-            dists = dists[mask]
+            # so we only average over the upper triangular half of dists
+            dists = dists[torch.ones_like(dists, dtype=torch.bool).triu(1)]
 
             self._avg_score = dists.mean().cpu().item(), dists.std().cpu().item()
 

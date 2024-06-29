@@ -1,6 +1,6 @@
 # Ideal Words
 
-This small package provides a PyTorch implementation of ideal word computation which was proposed by Trager et al. in the paper [Linear Spaces of Meanings: Compositional Structures in Vision-Language Models](https://arxiv.org/abs/2302.14383). Ideal words can be seen as a compositional approximation to a given set of embedding vectors. This package allows computing these ideal words given a factored set of concepts $\mathcal{Z} = \mathcal{Z}_1 \times \dots \times \mathcal{Z}_k$ (e.g., $\{\mathrm{blue}, \mathrm{red}\} \times \{\mathrm{car}, \mathrm{bike}\}$) and a embedding function $f : \mathcal{Z} \to \mathbb{R}^n$. Additionally, it allows to  quantify compositionality using the ideal word, real word, and average scores from the paper (see Table 6 and 7 for details).
+This package provides a PyTorch implementation of ideal word computation which was proposed by Trager et al. in the paper [Linear Spaces of Meanings: Compositional Structures in Vision-Language Models](https://arxiv.org/abs/2302.14383). Ideal words can be seen as a compositional approximation to a given set of embedding vectors. This package allows computing these ideal words given a factored set of concepts $\mathcal{Z} = \mathcal{Z}_1 \times \dots \times \mathcal{Z}_k$ (e.g., $\{\mathrm{blue}, \mathrm{red}\} \times \{\mathrm{car}, \mathrm{bike}\}$) and a embedding function $f : \mathcal{Z} \to \mathbb{R}^n$. Additionally, it allows to  quantify compositionality using the ideal word, real word, and average scores from the paper (see Table 6 and 7 for details).
 
 ## Usage
 
@@ -21,8 +21,9 @@ tokenizer = MyTokenizer()
 Z1 = ['blue', 'red']
 Z2 = ['car', 'bike']
 
-# create necessary objects
+# factor embedding is a embedding function with some additional logic
 fe = FactorEmbedding(txt_encoder, tokenizer)
+# compute ideal words from factor embedding and factors
 iw = IdealWords(fe, [Z1, Z2])
 
 # retrieve ideal word representation for a specific element of a factor
