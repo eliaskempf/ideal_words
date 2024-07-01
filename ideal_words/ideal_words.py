@@ -179,7 +179,7 @@ class IdealWords:
         """Compute ideal words as in Equation 4 of the paper."""
         # expand factor / weight lists into paired representation to allow for tensor operations
         alphas = torch.tensor(list(product(*self.weights))).to(self.device).double()
-        betas = alphas.prod(dim=1).to(self.device).unsqueeze(-1).double()
+        betas = alphas.prod(dim=1).unsqueeze(-1).double()
 
         # compute embeddings for each combination of factors
         captions = [self.factor_embedding.joint_repr(pair) for pair in self.pairs]

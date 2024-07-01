@@ -4,6 +4,108 @@ import torch.nn as nn
 from ideal_words import FactorEmbedding, IdealWords
 
 
+def test_auxillary_setup():
+    # toy example with predefined embeddings that are already compositional
+    Z1 = ['X1', 'X2']
+    Z2 = ['Y1', 'Y2', 'Y3', 'Y4']
+    Z3 = ['Z1', 'Z2', 'Z3']
+
+    # embeddings have 2 dimensions per factor and use one-hot encoding
+    embeddings = torch.randn(len(Z1) * len(Z2) * len(Z3), 4)
+
+    # we use random embeddings here as we only want to verify auxillary attributes used during ideal word computation
+    txt_encoder = nn.Identity()
+
+    def tokenizer(text: list[str]) -> torch.Tensor:
+        _ = text
+        return embeddings
+
+    # create factor embeddings and compute ideal words
+    fe = FactorEmbedding(txt_encoder, tokenizer, device='cpu')
+    iw = IdealWords(fe, [Z1, Z2, Z3])
+
+    # factor combinations
+    assert iw.pairs == [
+        ('X1', 'Y1', 'Z1'),
+        ('X1', 'Y1', 'Z2'),
+        ('X1', 'Y1', 'Z3'),
+        ('X1', 'Y2', 'Z1'),
+        ('X1', 'Y2', 'Z2'),
+        ('X1', 'Y2', 'Z3'),
+        ('X1', 'Y3', 'Z1'),
+        ('X1', 'Y3', 'Z2'),
+        ('X1', 'Y3', 'Z3'),
+        ('X1', 'Y4', 'Z1'),
+        ('X1', 'Y4', 'Z2'),
+        ('X1', 'Y4', 'Z3'),
+        ('X2', 'Y1', 'Z1'),
+        ('X2', 'Y1', 'Z2'),
+        ('X2', 'Y1', 'Z3'),
+        ('X2', 'Y2', 'Z1'),
+        ('X2', 'Y2', 'Z2'),
+        ('X2', 'Y2', 'Z3'),
+        ('X2', 'Y3', 'Z1'),
+        ('X2', 'Y3', 'Z2'),
+        ('X2', 'Y3', 'Z3'),
+        ('X2', 'Y4', 'Z1'),
+        ('X2', 'Y4', 'Z2'),
+        ('X2', 'Y4', 'Z3'),
+    ]
+
+    # factor to index mapping
+    assert iw.factor2idx == {
+        'X1': (0, 0),
+        'X2': (0, 1),
+        'Y1': (1, 0),
+        'Y2': (1, 1),
+        'Y3': (1, 2),
+        'Y4': (1, 3),
+        'Z1': (2, 0),
+        'Z2': (2, 1),
+        'Z3': (2, 2),
+    }
+
+    for zi in iw.factor2idx:
+        i, j = iw.factor2idx[zi]
+        assert iw.factors[i][j] == zi
+
+    # automatic uniform weights
+    assert len(iw.weights) == 3
+    assert iw.weights[0] == [1 / 2] * 2
+    assert iw.weights[1] == [1 / 4] * 4
+    assert iw.weights[2] == [1 / 3] * 3
+
+    assert iw.factor_indices == [
+        {
+            'X1': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            'X2': [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+        },
+        {
+            'Y1': [0, 1, 2, 12, 13, 14],
+            'Y2': [3, 4, 5, 15, 16, 17],
+            'Y3': [6, 7, 8, 18, 19, 20],
+            'Y4': [9, 10, 11, 21, 22, 23],
+        },
+        {
+            'Z1': [0, 3, 6, 9, 12, 15, 18, 21],
+            'Z2': [1, 4, 7, 10, 13, 16, 19, 22],
+            'Z3': [2, 5, 8, 11, 14, 17, 20, 23],
+        },
+    ]
+
+    for i, factor_index in enumerate(iw.factor_indices):
+        for zi, inds in factor_index.items():
+            # verify that the returned indices actually map back to the expected zi
+            for ind in inds:
+                assert iw.pairs[ind][i] == zi
+
+            # compare mean over indexed embedding vectors to ideal word
+            assert torch.allclose(iw.get_iw(zi), iw.embeddings[inds].mean(dim=0) - iw.u_zero)
+
+    # u_zero is just the mean over all embeddings
+    assert torch.allclose(iw.u_zero, iw.embeddings.mean(dim=0))
+
+
 def test_toy_embeddings():
     # toy example with predefined embeddings that are already compositional
     Z1 = ['blue', 'red']
