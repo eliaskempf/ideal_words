@@ -35,6 +35,13 @@ if __name__ == '__main__':
     parser.add_argument(
         '--random-init', action='store_true', help='use a randomly initialized encoder instead of the pretrained one'
     )
+    parser.add_argument(
+        '--score-mode',
+        type=str,
+        default='paper_repro',
+        choices=['avg_dist', 'avg_sq_dist', 'paper_repro'],
+        help='customize how scores are computed, see `IdealWords` docstring for details',
+    )
     args = parser.parse_args()
 
     # keep track of execution time
@@ -60,14 +67,14 @@ if __name__ == '__main__':
     fe = AttributeObjectFactorEmbedding(clip, tokenizer, normalize=True)
 
     # compute ideal words and score for mit-states
-    mit_iw = IdealWords(fe, factors['mit-states'], weights=None)  # weights=None uses uniform weights for all factors
+    mit_iw = IdealWords(fe, factors['mit-states'], weights=None, score_mode=args.score_mode)
     mit_iw_score, mit_iw_std = mit_iw.iw_score
     mit_rw_score, mit_rw_std = mit_iw.rw_score
     mit_avg_score, mit_avg_std = mit_iw.avg_score
     print('Computed ideal words and scores for MIT-States.')
 
     # compute ideal words and score for ut-zappos
-    ut_iw = IdealWords(fe, factors['ut-zappos'], weights=None)  # weights=None uses uniform weights for all factors
+    ut_iw = IdealWords(fe, factors['ut-zappos'], weights=None, score_mode=args.score_mode)
     ut_iw_score, ut_iw_std = ut_iw.iw_score
     ut_rw_score, ut_rw_std = ut_iw.rw_score
     ut_avg_score, ut_avg_std = ut_iw.avg_score

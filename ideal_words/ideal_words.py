@@ -1,7 +1,7 @@
 from functools import reduce
 from itertools import product
 from math import isclose
-from typing import Callable, Sequence
+from typing import Callable, Literal, Sequence
 
 import torch
 import torch.nn as nn
@@ -72,7 +72,7 @@ class FactorEmbedding:
         prompts = self.tokenizer(text)
         embeddings = []
         for batch in tqdm.tqdm(
-            DataLoader(TensorDataset(prompts), batch_size=self.batch_size),
+            DataLoader(TensorDataset(prompts), batch_size=self.batch_size, shuffle=False),
             desc='Compute embeddings',
             disable=disable_pbar,
         ):
@@ -127,7 +127,11 @@ class IdealWords:
     """
 
     def __init__(
-        self, factor_embedding: FactorEmbedding, factors: list[list[str]], weights: list[list[float]] | None = None
+        self,
+        factor_embedding: FactorEmbedding,
+        factors: list[list[str]],
+        weights: list[list[float]] | None = None,
+        score_mode: Literal['avg_dist', 'avg_sq_dist', 'paper_repro'] = 'avg_sq_dist',
     ) -> None:
         """
         Parameters
@@ -138,6 +142,15 @@ class IdealWords:
 
             weights: Optional list of lists of floats where each list represents the weights for the elements of the
                 factors. If omitted, uniform weights for all factor elements will be used. Default: `None`.
+
+            score_mode: Optional flag to customize score computation.
+                'avg_dist' - uses the average euclidean between embedding vectors for iw, rw, and avg score
+                'avg_sq_dist' - uses the average squared euclidean between embedding vectors for iw, rw, and avg score
+                'paper_repro' - uses average euclidean distance for iw and rw score and average squared euclidean
+                    distance for avg score, empirically this seems to be what they used in their paper (Tables 6 and 7)
+                In the paper, they state that they use squared distance everywhere which is why we choose this mode as
+                the default. However, to reproduce the results from the paper, use the 'paper_repro' mode (for details
+                see https://github.com/icetube23/ideal_words/issues/1). Default: `'avg_sq_dist'`.
         """
         # verify factors are disjoint
         assert len(reduce(lambda u, v: u | v, [set(factor) for factor in factors])) == sum(
@@ -150,6 +163,9 @@ class IdealWords:
         self.factor2idx = {zi: (i, j) for i, factor in enumerate(self.factors) for j, zi in enumerate(factor)}
         self.weights = weights if weights else [[1 / len(factor)] * len(factor) for factor in factors]
         self.device = self.factor_embedding.device
+
+        assert score_mode in ['avg_dist', 'avg_sq_dist', 'paper_repro'], f'Invalid score mode: {score_mode}'
+        self.score_mode = score_mode
 
         # verify weights
         assert len(self.factors) == len(self.weights)
@@ -257,7 +273,11 @@ class IdealWords:
             assert uz_hat.shape == self.embeddings.shape
 
             # compute distances between the compositional approximations and the actual embeddings
-            dists = (self.embeddings - uz_hat).norm(dim=1).square()
+            dists = torch.linalg.vector_norm(self.embeddings - uz_hat, dim=1)
+
+            # use average squared distance for score
+            if self.score_mode == 'avg_sq_dist':
+                dists = dists.square()
 
             self._iw_score = dists.mean().cpu().item(), dists.std().cpu().item()
 
@@ -276,7 +296,11 @@ class IdealWords:
             assert uz_hat.shape == self.embeddings.shape
 
             # compute distances between the approximations and the actual embeddings
-            dists = (self.embeddings - uz_hat).norm(dim=1).square()
+            dists = torch.linalg.vector_norm(self.embeddings - uz_hat, dim=1)
+
+            # use average squared distance for score
+            if self.score_mode == 'avg_sq_dist':
+                dists = dists.square()
 
             self._rw_score = dists.mean().cpu().item(), dists.std().cpu().item()
 
@@ -296,6 +320,10 @@ class IdealWords:
             # dists is a symmetric matrix with diagonal 0 because cdist considers ordered pairs
             # so we only average over the upper triangular half of dists
             dists = dists[torch.ones_like(dists, dtype=torch.bool).triu(1)]
+
+            # use average squared distance for score
+            if self.score_mode == 'avg_sq_dist' or self.score_mode == 'paper_repro':
+                dists = dists.square()
 
             self._avg_score = dists.mean().cpu().item(), dists.std().cpu().item()
 
