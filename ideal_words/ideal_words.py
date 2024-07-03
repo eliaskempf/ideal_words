@@ -132,6 +132,7 @@ class IdealWords:
         factors: list[list[str]],
         weights: list[list[float]] | None = None,
         score_mode: Literal['avg_dist', 'avg_sq_dist', 'paper_repro'] = 'avg_sq_dist',
+        verbose: int = 1,
     ) -> None:
         """
         Parameters
@@ -151,6 +152,12 @@ class IdealWords:
                 In the paper, they state that they use squared distance everywhere which is why we choose this mode as
                 the default. However, to reproduce the results from the paper, use the 'paper_repro' mode (for details
                 see https://github.com/icetube23/ideal_words/issues/1). Default: `'avg_sq_dist'`.
+
+            verbose: Optional int parameter to customize verbosity level.
+                0 - show no tqdm progress bar at all
+                1 - show tqdm progress bar during ideal word computation
+                2 - show tqdm progress bar during ideal and real word computation
+                Default: `1`.
         """
         # verify factors are disjoint
         assert len(reduce(lambda u, v: u | v, [set(factor) for factor in factors])) == sum(
@@ -166,6 +173,8 @@ class IdealWords:
 
         assert score_mode in ['avg_dist', 'avg_sq_dist', 'paper_repro'], f'Invalid score mode: {score_mode}'
         self.score_mode = score_mode
+        assert verbose in [0, 1, 2]
+        self.verbose = verbose
 
         # verify weights
         assert len(self.factors) == len(self.weights)
@@ -199,7 +208,7 @@ class IdealWords:
 
         # compute embeddings for each combination of factors
         captions = [self.factor_embedding.joint_repr(pair) for pair in self.pairs]
-        embeddings = self.factor_embedding.embedding_fn(captions).double()
+        embeddings = self.factor_embedding.embedding_fn(captions, disable_pbar=self.verbose < 1).double()
 
         # u_zero is a weighted average of all embeddings
         u_zero = (embeddings * betas).sum(dim=0)
@@ -229,7 +238,7 @@ class IdealWords:
         real_words = []
         for idx, factor in enumerate(self.factors):
             captions = [self.factor_embedding.single_repr(zi, idx) for zi in factor]
-            embeddings = self.factor_embedding.embedding_fn(captions, disable_pbar=True).float()
+            embeddings = self.factor_embedding.embedding_fn(captions, disable_pbar=self.verbose < 2).float()
             real_words.append(embeddings)
 
         self.real_words = real_words
