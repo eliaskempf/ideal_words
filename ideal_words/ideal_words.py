@@ -363,7 +363,7 @@ class IdealWords:
 
         # find nearest neighbor for each approximated embedding and compare against expected nearest neighbors
         approx_matches = dists.argmin(dim=0)
-        expected_matches = torch.arange(len(approx_matches))
+        expected_matches = torch.arange(len(approx_matches), device=self.device)
 
         return (approx_matches == expected_matches).float().mean().cpu().item()
 
