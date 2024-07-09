@@ -167,6 +167,7 @@ class IdealWords:
         self.factor_embedding = factor_embedding
         self.factors = factors
         self.pairs = list(product(*self.factors))
+        self.pair2idx = {pair: i for i, pair in enumerate(self.pairs)}
         self.factor2idx = {zi: (i, j) for i, factor in enumerate(self.factors) for j, zi in enumerate(factor)}
         self.weights = weights if weights else [[1 / len(factor)] * len(factor) for factor in factors]
         self.device = self.factor_embedding.device
@@ -191,6 +192,9 @@ class IdealWords:
         # compute embeddings and ideal words
         self._compute_ideal_words()
 
+        # approximation cache
+        self._uz: dict[str, torch.Tensor] = {}
+
         # lazily computed real words
         self.real_words = None
 
@@ -198,6 +202,10 @@ class IdealWords:
         self._iw_score = None
         self._rw_score = None
         self._avg_score = None
+
+        # lazily computed custom compositionality scores
+        self._iw_accuracy = None
+        self._rw_accuracy = None
 
     @torch.inference_mode()
     def _compute_ideal_words(self) -> None:
@@ -243,6 +251,16 @@ class IdealWords:
 
         self.real_words = real_words
 
+    @torch.inference_mode()
+    def _materialize_uz(self, approx: str) -> torch.Tensor:
+        # if not already materialized and cached, compute approximations
+        if approx not in self._uz:
+            uz_hat = torch.stack([self.get_uz(pair, approx=approx) for pair in self.pairs])
+            assert uz_hat.shape == self.embeddings.shape
+            self._uz[approx] = uz_hat
+
+        return self._uz[approx]
+
     def get_iw(self, zi: str) -> torch.Tensor:
         """Retrieve the ideal word representation of a given factor element."""
         assert zi in self.factor2idx, f'Unknown concept: {zi}'
@@ -262,12 +280,31 @@ class IdealWords:
     def get_uz(self, z: Sequence[str], approx: str = 'ideal') -> torch.Tensor:
         """Compute an approximation to the actual embedding of tuple z using either ideal or real words."""
         assert len(z) == len(self.factors)
+
+        # approximations are already cached and need not to be recomputed
+        if approx in self._uz:
+            idx = self.pair2idx[tuple(z)]
+            return self._uz[approx][idx]
+
         if approx == 'ideal':
             return torch.stack([self.get_iw(zi) for zi in z]).sum(dim=0) + self.u_zero
         elif approx == 'real':
             return torch.stack([self.get_rw(zi) for zi in z]).mean(dim=0)
         else:
             raise ValueError(f'Invalid approximation mode: {approx}')
+
+    def _score(self, approx: str) -> tuple[float, float]:
+        # get word approximation for each combination of factors
+        uz_hat = self._materialize_uz(approx)
+
+        # compute distances between the compositional approximations and the actual embeddings
+        dists = torch.linalg.vector_norm(self.embeddings - uz_hat, dim=1)
+
+        # use average squared distance for score
+        if self.score_mode == 'avg_sq_dist':
+            dists.square_()
+
+        return dists.mean().cpu().item(), dists.std().cpu().item()
 
     @property
     def iw_score(self) -> tuple[float, float]:
@@ -277,18 +314,7 @@ class IdealWords:
         successive accesses.
         """
         if self._iw_score is None:
-            # compute ideal word approximation for each combination of factors
-            uz_hat = torch.stack([self.get_uz(pair, approx='ideal') for pair in self.pairs])
-            assert uz_hat.shape == self.embeddings.shape
-
-            # compute distances between the compositional approximations and the actual embeddings
-            dists = torch.linalg.vector_norm(self.embeddings - uz_hat, dim=1)
-
-            # use average squared distance for score
-            if self.score_mode == 'avg_sq_dist':
-                dists = dists.square()
-
-            self._iw_score = dists.mean().cpu().item(), dists.std().cpu().item()
+            self._iw_score = self._score('ideal')
 
         return self._iw_score
 
@@ -300,18 +326,7 @@ class IdealWords:
         successive accesses.
         """
         if self._rw_score is None:
-            # compute real word approximation for each combination of factors
-            uz_hat = torch.stack([self.get_uz(pair, approx='real') for pair in self.pairs])
-            assert uz_hat.shape == self.embeddings.shape
-
-            # compute distances between the approximations and the actual embeddings
-            dists = torch.linalg.vector_norm(self.embeddings - uz_hat, dim=1)
-
-            # use average squared distance for score
-            if self.score_mode == 'avg_sq_dist':
-                dists = dists.square()
-
-            self._rw_score = dists.mean().cpu().item(), dists.std().cpu().item()
+            self._rw_score = self._score('real')
 
         return self._rw_score
 
@@ -332,8 +347,48 @@ class IdealWords:
 
             # use average squared distance for score
             if self.score_mode == 'avg_sq_dist' or self.score_mode == 'paper_repro':
-                dists = dists.square()
+                dists.square_()
 
             self._avg_score = dists.mean().cpu().item(), dists.std().cpu().item()
 
         return self._avg_score
+
+    def _accuracy(self, approx: str) -> float:
+        # get word approximation for each combination of factors
+        uz_hat = self._materialize_uz(approx).half()
+        embeddings = self.embeddings.half()  # save some memory as this metric is expensive to comput
+
+        # compute pairwise distances between the approximations and the actual embeddings
+        dists = torch.cdist(embeddings, uz_hat, compute_mode='use_mm_for_euclid_dist')
+
+        # find nearest neighbor for each approximated embedding and compare against expected nearest neighbors
+        approx_matches = dists.argmin(dim=0)
+        expected_matches = torch.arange(len(approx_matches))
+
+        return (approx_matches == expected_matches).float().mean().cpu().item()
+
+    @property
+    def iw_accuracy(self) -> float:
+        """
+        Retrieve the ideal words accuracy, i.e., find the nearest actual embedding vector for each approximate embedding
+        vector and compute the accuracy over how often the nearest neighbor matches the expected actual emebdding
+        vector. The first time this property is accessed the score will be computed and will be cached for successive
+        accesses.
+        """
+        if self._iw_accuracy is None:
+            self._iw_accuracy = self._accuracy('ideal')
+
+        return self._iw_accuracy
+
+    @property
+    def rw_accuracy(self) -> float:
+        """
+        Retrieve the real words accuracy, i.e., find the nearest actual embedding vector for each approximate embedding
+        vector and compute the accuracy over how often the nearest neighbor matches the expected actual emebdding
+        vector. The first time this property is accessed the score will be computed and will be cached for successive
+        accesses.
+        """
+        if self._rw_accuracy is None:
+            self._rw_accuracy = self._accuracy('real')
+
+        return self._rw_accuracy

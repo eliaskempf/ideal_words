@@ -141,6 +141,45 @@ def test_toy_embeddings():
 
     # approximations are perfect because embeddings were already compositional, thus distance is 0
     assert iw.iw_score == (0.0, 0.0)
+    assert iw.iw_accuracy == 1.0
+
+    # toy example with predefined embeddings that are not compositional
+    Z1 = ['blue', 'red']
+    Z2 = ['car', 'bike']
+
+    # embeddings use one-hot encoding
+    embeddings = {
+        'blue car': torch.Tensor([1, 0, 0, 0]),
+        'red car': torch.Tensor([0, 1, 0, 0]),
+        'blue bike': torch.Tensor([0, 0, 1, 0]),
+        'red bike': torch.Tensor([0, 0, 0, 1]),
+    }
+
+    # we use the predefined embeddings by returning them from the tokenizer and using nn.Identity() as text encoder
+    txt_encoder = nn.Identity()
+
+    def tokenizer(text: list[str]) -> torch.Tensor:
+        return torch.stack([embeddings[z] for z in text])
+
+    # create factor embeddings and compute ideal words
+    fe = FactorEmbedding(txt_encoder, tokenizer, normalize=False, device='cpu')
+    iw = IdealWords(fe, [Z1, Z2])
+
+    assert torch.allclose(iw.u_zero, torch.Tensor([0.25, 0.25, 0.25, 0.25]))
+    assert torch.allclose(iw.get_iw('blue'), torch.Tensor([0.25, -0.25, 0.25, -0.25]))
+    assert torch.allclose(iw.get_iw('red'), torch.Tensor([-0.25, 0.25, -0.25, 0.25]))
+    assert torch.allclose(iw.get_iw('car'), torch.Tensor([0.25, 0.25, -0.25, -0.25]))
+    assert torch.allclose(iw.get_iw('bike'), torch.Tensor([-0.25, -0.25, 0.25, 0.25]))
+
+    # in this case the ideal word approximations do not match the original embeddings
+    assert torch.allclose(iw.get_uz(('blue', 'car')), torch.Tensor([0.75, 0.25, 0.25, -0.25]))
+    assert torch.allclose(iw.get_uz(('red', 'car')), torch.Tensor([0.25, 0.75, -0.25, 0.25]))
+    assert torch.allclose(iw.get_uz(('blue', 'bike')), torch.Tensor([0.25, -0.25, 0.75, 0.25]))
+    assert torch.allclose(iw.get_uz(('red', 'bike')), torch.Tensor([-0.25, 0.25, 0.25, 0.75]))
+
+    # approximations are imperfect but distances are always the same so we have score > 0 but std = 0
+    assert iw.iw_score == (0.25, 0.0)
+    assert iw.iw_accuracy == 1.0  # approximations are still close enough
 
 
 def test_random_embeddings():
