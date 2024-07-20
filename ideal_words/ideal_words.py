@@ -54,7 +54,7 @@ class FactorEmbedding:
         else:
             self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def embedding_fn(self, text: list[str], disable_pbar: bool = False) -> torch.Tensor:
         """
         Generic method for computing text embeddings given a tokenizer and a text encoder model. Internally, called by
@@ -207,7 +207,7 @@ class IdealWords:
         self._iw_accuracy = None
         self._rw_accuracy = None
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def _compute_ideal_words(self) -> None:
         """Compute ideal words as in Equation 4 of the paper."""
         # expand factor / weight lists into paired representation to allow for tensor operations
@@ -239,7 +239,7 @@ class IdealWords:
         self.u_zero = u_zero.float()
         self.ideal_words = ideal_words
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def _compute_real_words(self) -> None:
         """Compute real words by encoding factor elements individually."""
         # real words are computed by embedding a prompt containing only info from a single factor at a time
@@ -251,7 +251,7 @@ class IdealWords:
 
         self.real_words = real_words
 
-    @torch.inference_mode()
+    @torch.no_grad()
     def _materialize_uz(self, approx: str) -> torch.Tensor:
         # if not already materialized and cached, compute approximations
         if approx not in self._uz:
