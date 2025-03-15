@@ -12,6 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}-latest
     timeout-minutes: 10
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu]
         python: ['3.10', 3.11, 3.12, 3.13]
@@ -30,4 +31,4 @@ jobs:
         pip install .[dev]
     - name: Tests
       run: |
-        pytest -vv --cov=ideal_words
+        pytest -vv --cov=ideal_words --cov-report term --cov-report=xml --cov-report=html
