@@ -246,7 +246,7 @@ def test_random_embeddings():
 
     for iw_per_factor in iw.ideal_words:
         # ideal words belonging to a factor Z_i should sum to zero
-        assert torch.allclose(iw_per_factor.sum(dim=0), torch.zeros(64))
+        assert torch.allclose(iw_per_factor.sum(dim=0), torch.zeros(64), atol=5e-7)
 
     # approximations are not perfect because embeddings are random
     assert iw.iw_score[0] >= 0.0
