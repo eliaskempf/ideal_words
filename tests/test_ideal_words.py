@@ -12,6 +12,7 @@ def test_auxillary_setup():
     Z3 = ['Z1', 'Z2', 'Z3']
 
     # dummy embeddings
+    torch.manual_seed(42)
     embeddings = torch.randn(len(Z1) * len(Z2) * len(Z3), 4)
 
     # we use random embeddings here as we only want to verify auxillary attributes used during ideal word computation
@@ -105,9 +106,13 @@ def test_auxillary_setup():
                 assert iw.pairs[ind][i] == zi
 
             # compare mean over indexed embedding vectors to ideal word
+            if not torch.allclose(iw.get_iw(zi), iw.embeddings[inds].mean(dim=0) - iw.u_zero):
+                print((iw.get_iw(zi) - (iw.embeddings[inds].mean(dim=0) - iw.u_zero)).abs().max())
             assert torch.allclose(iw.get_iw(zi), iw.embeddings[inds].mean(dim=0) - iw.u_zero)
 
     # u_zero is just the mean over all embeddings
+    if not torch.allclose(iw.u_zero, iw.embeddings.mean(dim=0)):
+        print((iw.u_zero - iw.embeddings.mean(dim=0)).abs().max())
     assert torch.allclose(iw.u_zero, iw.embeddings.mean(dim=0))
 
 
@@ -246,7 +251,9 @@ def test_random_embeddings():
 
     for iw_per_factor in iw.ideal_words:
         # ideal words belonging to a factor Z_i should sum to zero
-        assert torch.allclose(iw_per_factor.sum(dim=0), torch.zeros(64), atol=5e-7)
+        if not torch.allclose(iw_per_factor.sum(dim=0), torch.zeros(64)):
+            print(iw_per_factor.sum(dim=0).abs().max())
+        assert torch.allclose(iw_per_factor.sum(dim=0), torch.zeros(64))
 
     # approximations are not perfect because embeddings are random
     assert iw.iw_score[0] >= 0.0
