@@ -22,7 +22,7 @@ classifiers = [
 dependencies = ["torch", "tqdm"]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff", "pre-commit"]
+dev = ["pytest", "pytest-cov", "ruff", "pre-commit"]
 demo = ["open_clip_torch"]
 
 [tool.pytest.ini_options]

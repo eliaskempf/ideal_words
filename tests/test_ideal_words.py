@@ -1,3 +1,4 @@
+import pytest
 import torch
 import torch.nn as nn
 
@@ -5,12 +6,12 @@ from ideal_words import FactorEmbedding, IdealWords
 
 
 def test_auxillary_setup():
-    # toy example with predefined embeddings that are already compositional
+    # toy example to test the auxillary attributes used during ideal word computation
     Z1 = ['X1', 'X2']
     Z2 = ['Y1', 'Y2', 'Y3', 'Y4']
     Z3 = ['Z1', 'Z2', 'Z3']
 
-    # embeddings have 2 dimensions per factor and use one-hot encoding
+    # dummy embeddings
     embeddings = torch.randn(len(Z1) * len(Z2) * len(Z3), 4)
 
     # we use random embeddings here as we only want to verify auxillary attributes used during ideal word computation
@@ -19,6 +20,10 @@ def test_auxillary_setup():
     def tokenizer(text: list[str]) -> torch.Tensor:
         _ = text
         return embeddings
+
+    # when device is not specified, it defaults to cuda if available
+    fe = FactorEmbedding(txt_encoder, tokenizer, device=None)
+    assert fe.device == 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # create factor embeddings and compute ideal words
     fe = FactorEmbedding(txt_encoder, tokenizer, device='cpu')
@@ -106,18 +111,29 @@ def test_auxillary_setup():
     assert torch.allclose(iw.u_zero, iw.embeddings.mean(dim=0))
 
 
-def test_toy_embeddings():
+def test_compositional_toy_embeddings():
     # toy example with predefined embeddings that are already compositional
     Z1 = ['blue', 'red']
     Z2 = ['car', 'bike']
 
-    # embeddings have 2 dimensions per factor and use one-hot encoding
-    embeddings = {
+    # joint representations for ideal words
+    joint_embeddings = {
         'blue car': torch.Tensor([1, 0, 1, 0]),
         'red car': torch.Tensor([0, 1, 1, 0]),
         'blue bike': torch.Tensor([1, 0, 0, 1]),
         'red bike': torch.Tensor([0, 1, 0, 1]),
     }
+
+    # single representations for real words
+    single_embeddings = {
+        'blue': torch.Tensor([1, 0, 0, 0]),
+        'red': torch.Tensor([0, 1, 0, 0]),
+        'car': torch.Tensor([0, 0, 1, 0]),
+        'bike': torch.Tensor([0, 0, 0, 1]),
+    }
+
+    # embeddings have 2 dimensions per factor and use one-hot encoding
+    embeddings = {**joint_embeddings, **single_embeddings}
 
     # we use the predefined embeddings by returning them from the tokenizer and using nn.Identity() as text encoder
     txt_encoder = nn.Identity()
@@ -129,20 +145,42 @@ def test_toy_embeddings():
     fe = FactorEmbedding(txt_encoder, tokenizer, normalize=False, device='cpu')
     iw = IdealWords(fe, [Z1, Z2])
 
+    # test ideal word computation
     assert torch.allclose(iw.u_zero, torch.Tensor([0.5, 0.5, 0.5, 0.5]))
     assert torch.allclose(iw.get_iw('blue'), torch.Tensor([0.5, -0.5, 0, 0]))
     assert torch.allclose(iw.get_iw('red'), torch.Tensor([-0.5, 0.5, 0, 0]))
     assert torch.allclose(iw.get_iw('car'), torch.Tensor([0, 0, 0.5, -0.5]))
     assert torch.allclose(iw.get_iw('bike'), torch.Tensor([0, 0, -0.5, 0.5]))
 
-    for caption, embedding in embeddings.items():
-        z = caption.split(' ')
-        assert torch.allclose(iw.get_uz(z), embedding)  # u_z = u_zero + u_color + u_object
-
     # approximations are perfect because embeddings were already compositional, thus distance is 0
     assert iw.iw_score == (0.0, 0.0)
     assert iw.iw_accuracy == 1.0
 
+    # ideal word approximations exactly equal the original embeddings
+    for caption, embedding in joint_embeddings.items():
+        z = caption.split(' ')
+        assert torch.allclose(iw.get_uz(z), embedding)  # u_z = u_zero + u_color + u_object
+
+    # real words are just the embeddings themselves
+    for caption, embedding in single_embeddings.items():
+        assert torch.allclose(iw.get_rw(caption), embedding)
+
+    # real word approximations are also close to the original embeddings except scaled by 0.5
+    assert torch.allclose(iw.get_uz(['blue', 'car'], approx='real'), torch.Tensor([0.5, 0, 0.5, 0]))
+    assert torch.allclose(iw.get_uz(['red', 'car'], approx='real'), torch.Tensor([0, 0.5, 0.5, 0]))
+    assert torch.allclose(iw.get_uz(['blue', 'bike'], approx='real'), torch.Tensor([0.5, 0, 0, 0.5]))
+    assert torch.allclose(iw.get_uz(['red', 'bike'], approx='real'), torch.Tensor([0, 0.5, 0, 0.5]))
+
+    # real word approximations are not perfect even when embeddings are compositional, thus distance greater than 0
+    assert iw.rw_score == (pytest.approx(0.5), 0.0)
+    assert iw.rw_accuracy == 1.0
+
+    # requesting approximation modes other than 'ideal' or 'real' raises a value error
+    with pytest.raises(ValueError):
+        iw.get_uz(['blue', 'car'], approx='foobar')
+
+
+def test_noncompositional_toy_embeddings():
     # toy example with predefined embeddings that are not compositional
     Z1 = ['blue', 'red']
     Z2 = ['car', 'bike']
@@ -183,7 +221,7 @@ def test_toy_embeddings():
 
 
 def test_random_embeddings():
-    # toy example with predefined embeddings that are already compositional
+    # toy example with randomly initialized embeddings
     Z1 = ['A', 'B', 'C', 'D', 'E']
     Z2 = ['1', '2', '3', '4', '5']
     Z3 = ['.', '?', '!', ',', ';']
@@ -213,3 +251,6 @@ def test_random_embeddings():
     # approximations are not perfect because embeddings are random
     assert iw.iw_score[0] >= 0.0
     assert iw.iw_score[1] >= 0.0
+
+    assert iw.avg_score[0] >= 0.0
+    assert iw.avg_score[1] >= 0.0

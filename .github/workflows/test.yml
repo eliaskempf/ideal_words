@@ -14,12 +14,12 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu]
-        python: ['3.10', 3.11, 3.12]
+        python: ['3.10', 3.11, 3.12, 3.13]
         include:
         - os: macos
-          python: 3.12
+          python: 3.13
         - os: windows
-          python: 3.12
+          python: 3.13
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v4
@@ -30,4 +30,4 @@ jobs:
         pip install .[dev]
     - name: Tests
       run: |
-        pytest -vv
+        pytest -vv --cov=ideal_words
