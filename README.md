@@ -6,7 +6,7 @@ This package provides a PyTorch implementation of ideal word computation which w
 
 You can install the package using:
 ```
-pip install git+https://github.com/icetube23/ideal_words.git
+pip install ideal_words
 ```
 
 Consider you have a text encoder, a tokenizer, and a set of factors. You can then compute ideal words as follows:

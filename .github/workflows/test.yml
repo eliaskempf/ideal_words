@@ -28,6 +28,7 @@ jobs:
         python-version: ${{ matrix.python }}
     - name: Install
       run: |
+        pip install numpy
         pip install .[dev]
     - name: Tests
       run: |
