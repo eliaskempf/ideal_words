@@ -12,6 +12,7 @@ def test_auxillary_setup():
     Z3 = ['Z1', 'Z2', 'Z3']
 
     # dummy embeddings
+    torch.manual_seed(1337)
     embeddings = torch.randn(len(Z1) * len(Z2) * len(Z3), 4)
 
     # we use random embeddings here as we only want to verify auxillary attributes used during ideal word computation
@@ -227,7 +228,7 @@ def test_random_embeddings():
     Z3 = ['.', '?', '!', ',', ';']
 
     # we have 5 x 5 x 5 = 125 different combinations and an embedding dimension of 64
-    torch.manual_seed(42)
+    torch.manual_seed(1337)
     embeddings = torch.randn(125, 64)
 
     # we use the predefined embeddings by returning them from the tokenizer and using nn.Identity() as text encoder
