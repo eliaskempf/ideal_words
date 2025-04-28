@@ -51,7 +51,7 @@ python examples/clip_vit_large_14.py
 
 ## Scalability
 
-For small numbers of factors and/or small datasets, computing ideal words is really fast. The [example](examples/clip_vit_large_14.py) from the previous section computes ideal words using a CLIP ViT-L-14 model on two datasets and runs in less than a minute on a recently modern GPU.
+For small numbers of factors and/or small datasets, computing ideal words is really fast. The [example](examples/clip_vit_large_14.py) from the previous section computes ideal words using a CLIP ViT-L-14 model on two datasets and runs in less than a minute on a reasonably modern GPU.
 
 However, the approach does not scale well with an increasing number of factors. The computational complexity is at least exponential in the number of factors $\mathcal{\Omega}(\vert\mathcal{Z_1}\vert \times \dots \times \vert\mathcal{Z_k}\vert)$.
 
