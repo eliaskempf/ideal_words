@@ -43,7 +43,7 @@ You can also customize the behaviour of the `FactorEmbedding` class if your use-
 
 You can run this example locally by using:
 ```
-git clone https://github.com/icetube23/ideal_words.git
+git clone https://github.com/eliaskempf/ideal_words.git
 cd ideal_words
 pip install .[demo]  # it is recommended to do this in a virtual environment
 python examples/clip_vit_large_14.py
@@ -59,7 +59,7 @@ However, the approach does not scale well with an increasing number of factors. 
 
 The code is roughly tested but there still might be some bugs and/or inefficiencies. If you find anything, feel free to create an issue or to submit a pull request. If you want to contribute to this package, you should install it with the additional development dependencies:
 ```
-git clone https://github.com/icetube23/ideal_words.git
+git clone https://github.com/eliaskempf/ideal_words.git
 cd ideal_words
 pip install -e .[dev]  # it is recommended to do this in a virtual environment
 ```
